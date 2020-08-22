@@ -44,13 +44,14 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 };
 
+
 // screen options: [stocks, weather, performance]
-int volatile current_screen = 1;
-int num_screens = 3;
+uint8_t volatile current_screen = 1;
+uint8_t num_screens = 3;
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
   process_record_remote_kb(keycode, record);
   switch(keycode) {
-    case NXT_SCRN: //custom macro
+    case NXT_SCRN: // advance to the next screen
       if (record->event.pressed) {
         current_screen++;
         if (current_screen > num_screens) {
@@ -58,7 +59,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
         uint8_t send_data[32] = {0};
         send_data[0] = current_screen;
-        raw_hid_send(send_data, sizeof(send_data));
+        raw_hid_send(send_data, sizeof(send_data)); // let the host know we've switched
+                                                    // screens -- send new data to kb. 
       }
     break;
     
@@ -102,7 +104,6 @@ void stock_data_to_oled(int * stonk) {
   } else {
     snprintf(l4, sizeof(l4), "$%d.0%d\n", (stonk[1] << 8) + stonk[2], stonk[3]);
   }
-  
   oled_write(l4, false);
 
 
@@ -117,15 +118,15 @@ void stock_data_to_oled(int * stonk) {
 
 void weather_data_to_oled(int * data) {
   int current_id = data[0] + (data[1] << 8);
-  int current_temp = data[2];
-  int todays_min = data[3];
-  int todays_max = data[4];
-  int is_night = data[6];
+  uint8_t current_temp = data[2];
+  uint8_t todays_min = data[3];
+  uint8_t todays_max = data[4];
+  uint8_t is_night = data[6];
 
-  int next_update_time = data[10];
-  int temp_at_next_update = data[11];
+  uint8_t next_update_time = data[10];
+  uint8_t temp_at_next_update = data[11];
   int id_at_next_update = data[12] + (data[13] << 8);
-  int chance_of_precip = data[14];
+  uint8_t chance_of_precip = data[14];
 
   char cur_conditions[8];
   char next_conditions[8];
@@ -138,10 +139,7 @@ void weather_data_to_oled(int * data) {
   // weather conditions. This works by sending over a series of bytes in groups of
   // three. The first two bytes are used to determine the index of the oled that
   // should be drawn into. The third byte is used to determine which pixels to
-  // illuminate. I also tried storing the byte arrays corresponding to the images
-  // on the microcontroller, but there was not enough memory. Same story with sending
-  // over (x, y) coordinate pairs to draw, assuming you want to receive them all 
-  // before drawing. 
+  // illuminate.
   int pos;
   for (int i = 20; i < 390; i += 3) {
     if (data[i] > 0 || data[i+1] > 0) {
@@ -190,41 +188,47 @@ void weather_data_to_oled(int * data) {
     strcpy(next_conditions, "Cloudy");
   }
 
-
+  // Todays high temperature
   oled_set_cursor(0, 0);
   static char l1l[7] = {0};
   snprintf(l1l, sizeof(l1l), "H: %d", todays_max);
   oled_write(l1l, false);
 
+  // Current temperature
   oled_set_cursor(0, 1);
   static char l2l[9] = {0};
   snprintf(l2l, sizeof(l2l), "Now: %d", current_temp);
   oled_write(l2l, false);
 
+  // Current weather conditions (as text)
   oled_set_cursor(0, 2);
   oled_write(cur_conditions, false);
 
+  // Todays low temp
   oled_set_cursor(0, 3);
   static char l4l[7] = {0};
   snprintf(l4l, sizeof(l4l), "L: %d", todays_min);
   oled_write(l4l, false);
 
+  // Time of next update
   oled_set_cursor(15, 0);
   static char l1r[7] = {0};
   snprintf(l1r, sizeof(l1r), "%d:00", next_update_time);
   oled_write(l1r, false);
 
+  // Temperature at next update
   oled_set_cursor(15, 1);
   static char l2r[7] = {0};
   snprintf(l2r, sizeof(l2r), "%d F", temp_at_next_update);
   oled_write(l2r, false);
 
+  // Chance of precipitation
   oled_set_cursor(15, 2);
   static char l3r[8] = {0};
   snprintf(l3r, sizeof(l3r), "P: %d%%", chance_of_precip);
   oled_write(l3r, false);
 
-
+  // Weather conditions (as text) at next update
   oled_set_cursor(15, 3);
   static char l4r[7] = {0};
   snprintf(l4r, sizeof(l4r), "%s", next_conditions);
@@ -240,9 +244,9 @@ void performance_data_to_oled(int * data) {
   oled_write_ln_P(PSTR("SSD:"), false);
 
   int cur_row;
-  for (int stat = 0; stat < 4; stat++) {
+  for (uint8_t stat = 0; stat < 4; stat++) {
     cur_row = stat * 8 + 1;
-    for (int i = 0; i < 6; i++) {
+    for (uint8_t i = 0; i < 6; i++) {
       for (int j = 25; j < data[stat]; j++) {
         oled_write_pixel(j, cur_row+i, true);
       }
@@ -250,58 +254,33 @@ void performance_data_to_oled(int * data) {
   }
 }
 
-bool all_data_received = false;
-bool initialized_connection = false;
-int arr[400];
-int arr_pt = 0;
+int arr[400]; // holds data sent from host pc
+int arr_pt = 0; // stores current location in arr since we can only recieve 32 bytes at a time
+uint8_t prev_screen = 0;
 void raw_hid_receive(uint8_t *data, uint8_t length) {
 
-  // if (data[0] == 1 && data[1] == 127 && data[2] == 127 && data[3] == 127 && data[4] == 0 && data[5] == 127) {
-  //   // code for initiating a new connection
-  //   arr_pt = 0;
-  //   return;
-  // }
-
-  // for (int i = 1; i < 31; i++) {
-  //   // receive data
-  //   arr[arr_pt] = data[i];
-  //   arr_pt++;
-  // }
-
-  // if (arr_pt >= 390) {
-  //   // done receiving data, send to oled
-  //   if (current_screen == 1) {
-  //     stock_data_to_oled(arr);
-  //   } else if (current_screen == 2) {
-  //     weather_data_to_oled(arr);
-  //   } else {
-  //     performance_data_to_oled(arr);
-  //   }
-  //   return;
-  // }
-
-  if (!initialized_connection) {
-    initialized_connection = true;
+  // Check if this is a new incoming connection
+  if (data[0] == 127) {
+    arr_pt = 0;
     return;
   }
 
-  if (all_data_received && arr_pt >= 390) {
-    all_data_received = false;
-    arr_pt = 0;
+  // Add data from host pc to our array
+  for (uint8_t i = 1; i < 31; i++) {
+    arr[arr_pt] = data[i];
+    arr_pt++;
   }
 
-  if (!all_data_received) {
-    for (int i = 1; i < 31; i++) {
-      arr[arr_pt] = data[i];
-      arr_pt++;
-    }
-  }
-
+  // Check if we've received all of the data
   if (arr_pt >= 390) {
-    all_data_received = true;
-  }
 
-  if (all_data_received) {
+    // Clear the screen before rendering something new
+    if (prev_screen != current_screen) {
+      oled_clear();
+      oled_render();
+    }
+    prev_screen = current_screen;
+
     if (current_screen == 1){
       stock_data_to_oled(arr);
     } else if (current_screen == 2) {
@@ -309,6 +288,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
     } else {
       performance_data_to_oled(arr);
     }
+    arr_pt = 0; // reset arr_pt
   }
 
 }
