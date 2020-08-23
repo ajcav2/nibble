@@ -107,7 +107,12 @@ void stock_data_to_oled(int * stonk) {
   oled_write(l1, false);
 
   // Write the percent change from beginning of trading
-  oled_set_cursor(0, 1);
+  if (stonk[4] > 0) {
+    oled_set_cursor(0, 1);
+  } else {
+    oled_set_cursor(0, 2);
+  }
+  
   static char l2[28] = {0};
   snprintf(l2, sizeof(l2), "%d%%\n", stonk[0]-128);
   oled_write(l2, false);
@@ -195,6 +200,7 @@ void weather_data_to_oled(int * data) {
     strcpy(next_conditions, "Clear");
   } else if (id_at_next_update < 400) {
     strcpy(next_conditions, "Drizz");
+  } else if (id_at_next_update < 600) {
     strcpy(next_conditions, "Rain");
   } else if (id_at_next_update < 700) {
     strcpy(next_conditions, "Snow");
