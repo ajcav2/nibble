@@ -48,6 +48,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // screen options: [stocks, weather, performance]
 uint8_t volatile current_screen = 1;
 uint8_t num_screens = 3;
+bool volatile host_connected = false;
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
   process_record_remote_kb(keycode, record);
   switch(keycode) {
@@ -76,6 +77,21 @@ void matrix_init_user(void) {
 void matrix_scan_user(void) {
   matrix_scan_remote_kb();
 }
+
+char wpm[10] = {0};
+void oled_task_user(void) {
+  if (!host_connected) {
+    led_t led_state = host_keyboard_led_state();
+    oled_write_P(led_state.num_lock ? PSTR("NUM ") : PSTR("       "), false);
+    oled_write_P(led_state.caps_lock ? PSTR("CAPS ") : PSTR("       "), false);
+    oled_write_ln_P(led_state.scroll_lock ? PSTR("SCRL") : PSTR("       "), false);
+    
+    snprintf(wpm, sizeof(wpm), "WPM: %d", get_current_wpm());
+    oled_set_cursor(0,2);
+    oled_write(wpm, false);
+  }
+}
+
 
 // Use this to convert from unicode to a letter
 const char unicode_alpha[256] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -262,6 +278,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
   // Check if this is a new incoming connection
   if (data[0] == 127) {
     arr_pt = 0;
+    host_connected = true;
     return;
   }
 
