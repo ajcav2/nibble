@@ -16,6 +16,7 @@
 #include "remote_kb.h" 
 #include <string.h>
 #include "raw_hid.h"
+// #include <print.h>
 
 
 #define _MA 0
@@ -36,7 +37,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
   [_FN] = LAYOUT(
                RESET,   KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,  KC_HOME,  KC_INS, \
-    RGB_TOG, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, \
+    RGB_TOG, _______, RGB_MOD, RGB_HUI, RGB_SAI, RGB_VAI, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, \
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          _______, _______, \
     _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          _______, _______, \
     _______, _______, _______, _______,                   _______,                   _______, _______, _______, KC_MPRV,          KC_MPLY, KC_MNXT  \
@@ -78,18 +79,18 @@ void matrix_scan_user(void) {
   matrix_scan_remote_kb();
 }
 
-char wpm[10] = {0};
+// char wpm[10] = {0};
 void oled_task_user(void) {
-  if (!host_connected) {
-    led_t led_state = host_keyboard_led_state();
-    oled_write_P(led_state.num_lock ? PSTR("NUM ") : PSTR("       "), false);
-    oled_write_P(led_state.caps_lock ? PSTR("CAPS ") : PSTR("       "), false);
-    oled_write_ln_P(led_state.scroll_lock ? PSTR("SCRL") : PSTR("       "), false);
+  // if (!host_connected) {
+  //   led_t led_state = host_keyboard_led_state();
+  //   oled_write_P(led_state.num_lock ? PSTR("NUM ") : PSTR("       "), false);
+  //   oled_write_P(led_state.caps_lock ? PSTR("CAPS ") : PSTR("       "), false);
+  //   oled_write_ln_P(led_state.scroll_lock ? PSTR("SCRL") : PSTR("       "), false);
     
-    snprintf(wpm, sizeof(wpm), "WPM: %d", get_current_wpm());
-    oled_set_cursor(0,2);
-    oled_write(wpm, false);
-  }
+  //   snprintf(wpm, sizeof(wpm), "WPM: %d", get_current_wpm());
+  //   oled_set_cursor(0,2);
+  //   oled_write(wpm, false);
+  // }
 }
 
 
@@ -149,6 +150,16 @@ void weather_data_to_oled(int * data) {
   int id_at_next_update = data[12] + (data[13] << 8);
   uint8_t chance_of_precip = data[14];
 
+  // uprintf("current id: %d\n", current_id);
+  // uprintf("current temp: %d\n", current_temp);
+  // uprintf("todays min: %d\n", todays_min);
+  // uprintf("todays max: %d\n", todays_max);
+  // uprintf("is night: %d\n", is_night);
+  // uprintf("next update: %d\n", next_update_time);
+  // uprintf("temp at next update: %d\n", temp_at_next_update);
+  // uprintf("id at next update: %d\n", id_at_next_update);
+  // uprintf("chance of precip: %d\n\n", chance_of_precip);
+
   char cur_conditions[8];
   char next_conditions[8];
 
@@ -172,7 +183,6 @@ void weather_data_to_oled(int * data) {
   // weather condition codes: https://openweathermap.org/weather-conditions
   if (current_id < 300) {
     strcpy(cur_conditions, "Storms");
-
   } else if (current_id == 800) {
     strcpy(cur_conditions, "Clear");
   } else if (current_id < 400) {
