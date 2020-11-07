@@ -9,7 +9,7 @@
 #define show_performance true
 
 // Define which oled screen to start on
-// 0: stocks   1: weather   2: performance
+// 1: stocks   2: weather   3: performance
 int volatile current_screen = 2;
 
 // screen options: [stocks, weather, performance]
